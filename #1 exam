@@ -1,0 +1,88 @@
+# Base de datos y Analisis de Netflix
+
+import pandas as pd
+import pymysql
+
+mysql_conn = pymysql.connect(
+    host='localhost',
+    user='root',
+    password='12345678',
+    port=3306,
+    cursorclass=pymysql.cursors.DictCursor
+)
+
+try:
+    with mysql_conn.cursor() as cursor:
+        cursor.execute("CREATE DATABASE IF NOT EXISTS NetflixDB")
+        cursor.execute("USE NetflixDB")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS catalogo (
+                show_id VARCHAR(10) PRIMARY KEY,
+                type VARCHAR(20),
+                title VARCHAR(255),
+                director TEXT,
+                cast TEXT,
+                country VARCHAR(255),
+                date_added VARCHAR(50),
+                release_year INT,
+                rating VARCHAR(20),
+                duration VARCHAR(50),
+                listed_in TEXT,
+                description TEXT
+            )
+        """)
+
+        df = pd.read_csv('netflix_titles.csv')
+        df.fillna('', inplace=True)
+
+        # insertar datos
+        for i, row in df.iterrows(): #
+            values = tuple(row[col] for col in df.columns)
+            cursor.execute("""
+            REPLACE INTO catalogo (
+                    show_id, type, title, director, cast, country,
+                    date_added, release_year, rating, duration,
+                    listed_in, description
+                ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """, values)
+
+        mysql_conn.commit()
+
+        cursor.execute("SELECT * FROM catalogo")
+        records = cursor.fetchall()
+        df_mysql = pd.DataFrame(records)
+
+finally:
+    mysql_conn.close()
+
+# -------- ANÁLISIS CON PANDAS -------- #
+
+# limpiamos
+df_mysql['country'] = df_mysql['country'].str.split(',') # de texto a lista
+df_exploded = df_mysql.explode('country') # para crear una fila para cada elemento
+df_exploded['country'] = df_exploded['country'].str.strip() #quitar espacios
+
+# esto ya es para ver cuantos titulos hay en el pais
+titulos_por_pais = df_exploded['country'].value_counts()
+
+# duracion promedio de titulos por pais
+def extraer_duracion(valor):
+    if pd.isna(valor) or valor == '':
+        return None
+    try:
+        return int(valor.split()[0])
+    except:
+        return None
+
+df_exploded['duracion_num'] = df_exploded['duration'].apply(extraer_duracion)
+
+# Calcular duración promedio por país (solo para películas)
+duracion_promedio = df_exploded.groupby('country')['duracion_num'].mean().dropna()
+
+# Mostrar resultados
+print("\nTítulos por país:")
+print(titulos_por_pais)
+
+print("\nDuración promedio por país:")
+print(duracion_promedio)
