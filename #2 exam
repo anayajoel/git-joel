@@ -1,0 +1,33 @@
+#Limpieza y Analisis de Datos
+import pandas as pd
+
+def analizar_ventas():
+    try:
+        df = pd.read_csv("sales_data.csv")
+        print("Archivo cargado correctamente.")
+    except FileNotFoundError:
+        print("El archivo 'sales_data.csv' no se encontró.")
+        return
+
+    # Eliminar filas con ventas faltantes
+    df = df.dropna(subset=['sales'])
+
+    # Rellenar valores nulos de región con "Desconocido"
+    df['region'] = df['region'].fillna('Desconocido')
+
+    # Agregar nueva columna con 16% de IVA
+    df['ventas_con_iva'] = df['sales'] * 1.16
+
+    # Total de ventas por región
+    total_por_region = df.groupby('region')['sales'].sum()
+    print("\n Total de ventas por región:")
+    print(total_por_region)
+
+    # Promedio de ventas por producto
+    promedio_por_producto = df.groupby('product')['sales'].mean()
+    print("\n Promedio de ventas por producto:")
+    print(promedio_por_producto)
+
+    return df
+
+df_limpio = analizar_ventas()
